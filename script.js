@@ -1,8 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const memeTemplateSelect = document.getElementById('meme-template');
-    const topTextInput = document.getElementById('top-text');
-    const bottomTextInput = document.getElementById('bottom-text');
+    const memeTextInput = document.getElementById('meme-text');
     const generateBtn = document.getElementById('generate-btn');
     const randomBtn = document.getElementById('random-btn');
     const downloadBtn = document.getElementById('download-btn');
@@ -15,13 +14,81 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentMeme = null;
     
     // Initialize
-    fetchTrendingMemes();
-    
-    // Event Listeners
-    generateBtn.addEventListener('click', generateMeme);
-    randomBtn.addEventListener('click', generateRandomMeme);
-    downloadBtn.addEventListener('click', downloadMeme);
-    memeTemplateSelect.addEventListener('change', onTemplateChange);
+    if (
+        memeTemplateSelect &&
+        memeTextInput &&
+        generateBtn &&
+        randomBtn &&
+        downloadBtn &&
+        canvas &&
+        ctx &&
+        trendingMemesContainer
+    ) {
+        fetchTrendingMemes();
+
+        // Event Listeners
+        generateBtn.addEventListener('click', generateMeme);
+        randomBtn.addEventListener('click', generateRandomMeme);
+        downloadBtn.addEventListener('click', downloadMeme);
+        memeTemplateSelect.addEventListener('change', onTemplateChange);
+    } else {
+        console.error('One or more DOM elements are missing. Please check your HTML.');
+    }
+
+    // Reduce meme text font size for better readability
+    // Change font size calculation in generateMeme
+    const originalGenerateMeme = generateMeme;
+    generateMeme = function() {
+        if (!currentMeme || !currentMeme.url) return;
+
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = currentMeme.url;
+
+        img.onload = function() {
+            const maxWidth = 500;
+            const ratio = img.width > 0 ? maxWidth / img.width : 1;
+            canvas.width = maxWidth;
+            canvas.height = img.height * ratio;
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = canvas.width / 100;
+            ctx.textAlign = 'center';
+
+            // Reduced font size (was canvas.width / 10, now / 18)
+            const fontSize = Math.floor(canvas.width / 18);
+            ctx.font = `bold ${fontSize}px Impact, Arial, sans-serif`;
+
+            if (memeTextInput.value) {
+                const textLines = memeTextInput.value.split('\n');
+                const verticalSpacing = fontSize * 1.5;
+                const startY = canvas.height / 2 - ((textLines.length - 1) * verticalSpacing) / 2;
+
+                textLines.forEach((line, index) => {
+                    const yPosition = startY + (index * verticalSpacing);
+                    const text = line.toUpperCase();
+
+                    const textWidth = ctx.measureText(text).width;
+                    const padding = 10;
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(
+                        canvas.width / 2 - textWidth / 2 - padding,
+                        yPosition - fontSize / 2 - padding,
+                        textWidth + padding * 2,
+                        fontSize + padding * 2
+                    );
+                    ctx.restore();
+
+                    drawTextLine(text, canvas.width / 2, yPosition);
+                });
+            }
+        };
+    };
     
     // Functions
     async function fetchTrendingMemes() {
@@ -102,36 +169,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    function generateRandomMeme() {
-        if (memeTemplates.length === 0) return;
-        
-        const randomIndex = Math.floor(Math.random() * memeTemplates.length);
-        currentMeme = memeTemplates[randomIndex];
-        memeTemplateSelect.value = currentMeme.id;
-        
-        // Fun random text suggestions
-        const topTexts = [
-            "WHEN YOU SEE IT", 
-            "ME: DOES THE DISHES", 
-            "WHEN YOUR CODE WORKS", 
-            "HOW I IMAGINED VS HOW IT WENT"
-        ];
-        
-        const bottomTexts = [
-            "STILL DON'T SEE IT", 
-            "WIFE: LOOKS AT THE DISHES", 
-            "VS HOW IT ACTUALLY WORKS", 
-            "REALITY IS OFTEN DISAPPOINTING"
-        ];
-        
-        topTextInput.value = topTexts[Math.floor(Math.random() * topTexts.length)];
-        bottomTextInput.value = bottomTexts[Math.floor(Math.random() * bottomTexts.length)];
-        
-        generateMeme();
-    }
+function generateRandomMeme() {
+    const randomIndex = Math.floor(Math.random() * memeTemplates.length);
+    currentMeme = memeTemplates[randomIndex];
+    memeTemplateSelect.value = currentMeme.id;
+    
+    // Fun random text suggestions
+    const memeTexts = [
+        "WHEN YOUR CODE WORKS\n VS HOW IT ACTUALLY WORKS",
+        "HOW I IMAGINED IT\n VS \nHOW IT WENT",
+        "EXPECTATION\n VS \nREALITY",
+        "ME: DOES THE DISHES \n WIFE: LOOKS AT THE DISHES",
+        "STARTS PROJECT\n VS \nFINISHES PROJECT"
+    ];
+    memeTextInput.value = memeTexts[Math.floor(Math.random() * memeTexts.length)];
+    generateMeme();
+}
     
     function generateMeme() {
-        if (!currentMeme) return;
+        if (!currentMeme || !currentMeme.url) return;
         
         const img = new Image();
         img.crossOrigin = 'Anonymous';
@@ -152,26 +208,48 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.strokeStyle = 'black';
             ctx.lineWidth = canvas.width / 100;
             ctx.textAlign = 'center';
-            
-            const fontSize = canvas.width / 10;
-            ctx.font = `bold ${fontSize}px Impact, sans-serif`;
-            
-            // Top text
-            if (topTextInput.value) {
-                ctx.fillText(topTextInput.value.toUpperCase(), canvas.width / 2, fontSize);
-                ctx.strokeText(topTextInput.value.toUpperCase(), canvas.width / 2, fontSize);
-            }
-            
-            // Bottom text
-            if (bottomTextInput.value) {
-                ctx.fillText(bottomTextInput.value.toUpperCase(), canvas.width / 2, canvas.height - fontSize / 2);
-                ctx.strokeText(bottomTextInput.value.toUpperCase(), canvas.width / 2, canvas.height - fontSize / 2);
-            }
+    
+            // Dynamically set font size based on canvas width
+            const fontSize = Math.floor(canvas.width / 10);
+            ctx.font = `bold ${fontSize}px Impact, Arial, sans-serif`;
+    
+if (memeTextInput.value) {
+    const textLines = memeTextInput.value.split('\n');
+    const verticalSpacing = fontSize * 1.5;
+    const startY = canvas.height / 2 - ((textLines.length - 1) * verticalSpacing) / 2;
+    
+    textLines.forEach((line, index) => {
+        const yPosition = startY + (index * verticalSpacing);
+        const text = line.toUpperCase();
+        
+        // Measure text width for background
+        const textWidth = ctx.measureText(text).width;
+        const padding = 10;
+        
+        // Draw background
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(
+            canvas.width / 2 - textWidth / 2 - padding,
+            yPosition - fontSize / 2 - padding,
+            textWidth + padding * 2,
+            fontSize + padding * 2
+        );
+        ctx.restore();
+        
+        // Draw text
+        drawTextLine(text, canvas.width / 2, yPosition);
+    });
+}
         };
     }
+    function drawTextLine(text, x, y) {
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
+}
     
     function downloadMeme() {
-        if (!currentMeme) return;
+        if (!currentMeme || !currentMeme.url) return;
         
         const link = document.createElement('a');
         link.download = `meme-${Date.now()}.jpg`;
